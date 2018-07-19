@@ -1,50 +1,44 @@
 package com.noname.server;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 
-import java.lang.annotation.Annotation;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
 import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_LENGTH;
 import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
-import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpUtil.isKeepAlive;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import static java.util.AbstractMap.SimpleImmutableEntry;
+//import static io.netty.handler.codec.http.HttpHeaders.isKeepAlive;
 
 public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 
-    public static final String KEY_FORMAT = "%s %s";
-    private HttpRequest request;
-    private final StringBuilder buf = new StringBuilder();
-    private final Map<String, UriHandlerBased> handlersMap;
+    private static final String KEY_FORMAT = "%s %s";
 
-    public ServerHandler(List<UriHandlerBased> handlers) {
-        final Map<String, UriHandlerBased> tempMap = new HashMap<>();
-            try {
-                for (UriHandlerBased handler :handlers) {
-                    Class<? extends UriHandlerBased> clz = handler.getClass();
-                    Annotation annotation = clz.getAnnotation(Mapped.class);
-                    if (annotation!=null) {
-                        tempMap.put(getKey((Mapped) annotation), clz.getDeclaredConstructor().newInstance());
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+    private final Map<String, SimpleImmutableEntry<IRequestHandler, ICodec>> handlersMap;
+
+    ServerHandler(List<IRequestHandler> handlers) {
+        List<IRequestHandler> list = new ArrayList<>(handlers);
+        final Map<String, SimpleImmutableEntry<IRequestHandler, ICodec>> tempMap = new HashMap<>();//TODO: Map<String, List<IRequestHandler>>
+        try {
+            for (IRequestHandler handler : list) {
+                tempMap.put(getKey(handler), new SimpleImmutableEntry<>(handler, handler.getCodec()));
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         handlersMap = Collections.unmodifiableMap(tempMap);
     }
 
-    private String getKey(Mapped annotation) {
-        return String.format(KEY_FORMAT,annotation.method().name(),annotation.uri());
+    private String getKey(IRequestHandler handler) {
+        return String.format(KEY_FORMAT, handler.getMethod().name(), handler.getUrl());
     }
 
     @Override
@@ -54,34 +48,103 @@ public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-        UriHandlerBased handler = null;
-        if (msg instanceof HttpRequest) {
+        SimpleImmutableEntry<IRequestHandler, ICodec> entry = null;
+        if (msg instanceof FullHttpRequest) {
+            FullHttpRequest fullHttpRequest = (FullHttpRequest) msg;
+
+            IResponse response = new ResponseImpl();
+            entry = handlersMap.get(getKey(fullHttpRequest));
+
+            if (entry != null) {
+                final ICodec codec = entry.getValue();
+                final IRequest request = convert(fullHttpRequest, codec);
+                entry.getKey().process(request, response);
+                FullHttpResponse fullHttpResponse = convert(response, fullHttpRequest, codec);
+                ctx.write(fullHttpResponse);
+            }
+        }
+
+
+    }
+
+    private IRequest convert(FullHttpRequest fullHttpRequest, ICodec codec) {
+        final ByteBuf buf = fullHttpRequest.content();
+        IRequest request = new RequestImpl(fullHttpRequest);
+        decode(request, buf, codec);
+        return request;
+    }
+
+    private FullHttpResponse convert(IResponse response, FullHttpRequest fullHttpRequest, ICodec codec) {
+        byte[] bytes = getBytes(response, codec);
+        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
+                HTTP_1_1, OK,
+                Unpooled.copiedBuffer(bytes));
+        fullHttpResponse.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
+        if (isKeepAlive(fullHttpRequest)) {
+            fullHttpResponse.headers().set(CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+
+        }
+        final int len = fullHttpResponse.content().readableBytes();
+        if (len != 0) {
+            fullHttpResponse.headers().set(CONTENT_LENGTH, len);
+        }
+        return fullHttpResponse;
+    }
+
+    private byte[] getBytes(IResponse response, ICodec codec) {
+        final Object source = response.getSource();
+        byte[] bytes = new byte[0];
+        if (source != null) {
+            try {
+                bytes = codec.encode(source);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return bytes;
+    }
+
+    private void decode(IRequest requestAdapter, ByteBuf buf, ICodec codec) {
+        if (codec != null) {
+            byte[] buffer = new byte[buf.readableBytes()];
+            buf.readBytes(buffer);
+            try {
+                requestAdapter.setSource(codec.decode(buffer));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+
+       /* if (msg instanceof HttpRequest) {
             HttpRequest request = this.request = (HttpRequest) msg;
-            buf.setLength(0);
+            response = new ResponseImpl(); //FIXME
             handler = handlersMap.get(getKey(request));
             if (handler!=null) {
-                handler.process(request, buf);
+                handler.process(new HttpRequestAdapter(request), response);
             }
         }
         if (msg instanceof LastHttpContent) {
-            FullHttpResponse response = new DefaultFullHttpResponse(
+         *//*   FullHttpResponse response = new DefaultFullHttpResponse(
                     HTTP_1_1,
                     ((LastHttpContent) msg).decoderResult().isSuccess()? OK : BAD_REQUEST,
-                    Unpooled.copiedBuffer(buf.toString(), CharsetUtil.UTF_8)
+                    Unpooled.copiedBuffer(response.toString(), CharsetUtil.UTF_8)
             );
-            response.headers().set(CONTENT_TYPE, handler!=null ? handler.getContentType() : "text/plain; charset=UTF-8");
+            response.headers().set(CONTENT_TYPE,  "text/plain; charset=UTF-8");
 
             if (isKeepAlive(request)) {
                 response.headers().set(CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                 response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
-            }
-            ctx.write(response);
-        }
-    }
+            }*//*
+            FullHttpResponse fullResp = new DefaultFullHttpResponseAdapter(response, isKeepAlive(request));
+            ctx.write(fullResp);
+        }*/
 
-    private String getKey(HttpRequest context) {
+
+    private String getKey(HttpRequest request) {
         QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.uri());
-        return String.format(KEY_FORMAT, context.method().name(), queryStringDecoder.path());
+        return String.format(KEY_FORMAT, request.method().name(), queryStringDecoder.path());
 
 
     }

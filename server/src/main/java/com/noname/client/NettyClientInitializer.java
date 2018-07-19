@@ -21,7 +21,7 @@ public class NettyClientInitializer extends ChannelInitializer<SocketChannel> {
         // Create a default pipeline implementation.
         ChannelPipeline p = ch.pipeline();
 
-        p.addLast("log", new LoggingHandler(LogLevel.INFO));
+       p.addLast("log", new LoggingHandler(LogLevel.INFO));
         // Enable HTTPS if necessary.
         /*
         if (ssl) {
@@ -32,7 +32,7 @@ public class NettyClientInitializer extends ChannelInitializer<SocketChannel> {
             p.addLast("ssl", new SslHandler(engine));
         }
 */
-        p.addLast("codec", new HttpClientCodec());
+       p.addLast("codec", new HttpClientCodec());
 
         // Remove the following line if you don't want automatic content decompression.
         // p.addLast("inflater", new HttpContentDecompressor());

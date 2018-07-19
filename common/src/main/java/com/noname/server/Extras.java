@@ -6,4 +6,8 @@ public enum Extras {
     String getAttrName(){
         return this.name().toLowerCase();
     }
+    static Extras value(String str){
+        return Enum.valueOf(Extras.class,str.toUpperCase() );
+
+    }
 }

@@ -12,5 +12,6 @@ public interface IHttpRequestResponse {
     String getProtocolVersion();
     void setProtocolVersion(String version);
     Map<String, String> getHeaders();
-    EnumMap<Extras,String> getExtras();
+    Object getSource();
+    void setSource(Object obj);
 }

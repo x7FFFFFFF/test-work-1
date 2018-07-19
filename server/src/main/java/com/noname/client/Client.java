@@ -2,24 +2,30 @@ package com.noname.client;
 
 import com.noname.server.Methods;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
 
 import java.net.URI;
+import java.nio.charset.Charset;
 
 public class Client {
 
     private final URI uri;
     private final int port;
     private final HttpMethod method;
+    private String payload;
 
-    public Client(URI uri, Methods method) {
+    public Client(URI uri, Methods method, String payload) {
         this.uri = uri;
         this.port = uri.getPort();
         this.method = HttpMethod.valueOf(method.name());
+        this.payload = payload;
     }
 
     public void start() throws InterruptedException {
@@ -34,12 +40,23 @@ public class Client {
                     .channel(NioSocketChannel.class)
                     .handler(new NettyClientInitializer(ssl));
             // Make the connection attempt.
-            Channel ch = b.connect(host, port).sync().channel();
+            final ChannelFuture channelFuture = b.connect(host, port).sync();
+            Channel ch = channelFuture.channel();
             // Prepare the HTTP request.
-            HttpRequest request = new DefaultHttpRequest(
-                    HttpVersion.HTTP_1_1, HttpMethod.GET, uri.getRawPath());
+            FullHttpRequest request = new DefaultFullHttpRequest(
+                    HttpVersion.HTTP_1_1, method, uri.getRawPath());
             request.headers().set(HttpHeaders.Names.HOST, host);
             request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.CLOSE);
+           if (method==HttpMethod.POST){
+               ByteBuf bb= Unpooled.copiedBuffer(payload,Charset.defaultCharset());
+
+               request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/x-www-form-urlencoded");
+               request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, bb.readableBytes());
+               request.content().clear().writeBytes(bb);
+
+           }
+
+
             //request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
 
                 /*// Set some example cookies.
