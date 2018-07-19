@@ -8,34 +8,36 @@ import java.util.Map;
 
 public class RequestImpl implements IRequest {
 
-    private HttpRequest request;
+   // private HttpRequest request;
     private Object source;
+    private Methods method;
+    private URI uri;
 
 
-    public RequestImpl(FullHttpRequest request) {
-        this.request = request;
+    public RequestImpl() {
+       // this.request = request;
 
     }
 
 
     @Override
     public Methods getMethod() {
-        return null;
+        return method;
     }
 
     @Override
     public void setMethod(Methods method) {
-
+        this.method = method;
     }
 
     @Override
     public URI getUri() {
-        return null;
+        return uri;
     }
 
     @Override
     public void setUri(URI uri) {
-
+        this.uri = uri;
     }
 
     @Override

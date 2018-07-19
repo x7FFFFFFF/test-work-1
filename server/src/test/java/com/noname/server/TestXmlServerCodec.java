@@ -12,7 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.EnumMap;
 import java.util.Map;
 
-public class TestXmlCodec implements ICodec {
+public class TestXmlServerCodec implements ICodec {
     private static final String EXTRA = "extra";
     private static final String REQUEST_TYPE = "request-type";
 

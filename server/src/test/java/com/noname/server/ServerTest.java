@@ -3,6 +3,7 @@ package com.noname.server;
 
 
 import com.noname.client.Client;
+import org.junit.Assert;
 import org.junit.Test;
 
 
@@ -10,9 +11,6 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 public class ServerTest {
     void setUp() {
@@ -26,6 +24,7 @@ public class ServerTest {
     public void test() throws Exception {
         Map<String,String> params = new HashMap<>();
         params.put(IServer.PORT, "8881");
+
         final Server server = new Server();
         server.init(params, Collections.singletonList(new IRequestHandler() {
 
@@ -41,7 +40,8 @@ public class ServerTest {
 
             @Override
             public ICodec getCodec() {
-                return new TestXmlCodec();
+
+                return new TestXmlServerCodec();
             }
 
             @Override
@@ -54,16 +54,25 @@ public class ServerTest {
 
         server.start();
         server.waitForRun();
-        System.out.println("params = " + server.getStatus());
-        //server.stop();
-        //server.waitForStop();
-        //System.out.println("params = " + server.getStatus());
 
+        IRequest request = new RequestImpl();
+        request.setMethod(Methods.POST);
+        request.setUri(new URI("http://localhost:8881/h1"));
+        TestRequest payload = new TestRequest();
+        payload.setRequestsType(RequestsTypes.CREATE_AGT);
+        payload.getExtras().put(Extras.LOGIN, "123");
+        payload.getExtras().put(Extras.PASSWORD, "pwd");
+        request.setSource(payload);
 
+        Client client = new Client(params, new XmlClientCodec());
 
-        URI uri =new URI("http://localhost:8881/h1");
-        Client client = new Client(uri,  Methods.POST, "<?xml version=\"1.0\" encoding=\"utf-8\" ?>   <request><request-type>CREATE-AGT</request-type><extra name=\"login\">123</extra><extra name=\"password\">pwd</extra></request>");
         client.start();
+        client.waitForRun();
+        final IResponse response = client.send(request);
+        final TestResponse responsePayload = (TestResponse) response.getSource();
+        Assert.assertNotNull(responsePayload);
+        Assert.assertEquals(responsePayload.getResultCode(), 0);
+        client.stop();
 
     }
 

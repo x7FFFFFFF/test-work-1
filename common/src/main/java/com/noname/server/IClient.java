@@ -4,27 +4,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-public interface IServer {
-
-    String WORKER_COUNTS = "server.workers.count";
+public interface IClient {
     String PORT = "server.port";
     String PORT_DEFAULT_VALUE = "8888";
     String HOST = "server.host";
 
 
     enum Status {
-        INIT, INIT_OK, RUN, ERROR, STOP, STOP_OK
+        INIT, INIT_OK, RUN, STOP, STOP_OK
     }
 
-    void init(Properties properties, List<IRequestHandler> handlers);
+ /*   void init(Properties properties);
 
-    void init(Map<String, String> map, List<IRequestHandler> handlers);
+    void init(Map<String, String> map);*/
 
     void start() throws InterruptedException;
 
     void stop();
 
-    Status getStatus();
+    IClient.Status getStatus();
+
+    /**
+     * Warning: blocking!
+     */
+    IResponse send(IRequest request) throws Exception;
 
     /**
      * Warning: block current thread until server will start
@@ -35,5 +38,4 @@ public interface IServer {
      * Warning: block current thread until server will stop
      */
     void waitForStop() throws InterruptedException;
-
 }

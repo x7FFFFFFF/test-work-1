@@ -69,7 +69,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Object> {
 
     private IRequest convert(FullHttpRequest fullHttpRequest, ICodec codec) {
         final ByteBuf buf = fullHttpRequest.content();
-        IRequest request = new RequestImpl(fullHttpRequest);
+        IRequest request = new RequestImpl();
         decode(request, buf, codec);
         return request;
     }

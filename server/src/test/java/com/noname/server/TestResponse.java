@@ -14,6 +14,10 @@ public class TestResponse {
     public TestResponse() {
     }
 
+    public void setResultCode(int resultCode) {
+        this.resultCode = resultCode;
+    }
+
     public int getResultCode() {
         return resultCode;
     }
