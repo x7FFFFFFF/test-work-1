@@ -13,12 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ServerTest {
-    void setUp() {
 
-    }
-
-    void tearDown() {
-    }
 
     @Test
     public void test() throws Exception {
@@ -72,10 +67,12 @@ public class ServerTest {
         Assert.assertNotNull(responsePayload);
         Assert.assertEquals(responsePayload.getResultCode(), 0);
         client.stop();
-
+        client.waitForStop();
 
         server.stop();
         server.waitForStop();
+
+       // Thread.sleep(1000*20);
 
     }
 

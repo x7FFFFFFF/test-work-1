@@ -9,7 +9,7 @@ public abstract class AbstractService implements IService {
 
     private static final int TIMEOUT = 2;
     private static final int NUMBER_ATTEMPTS = 10;
-    private final AtomicReference<Status> status = new AtomicReference<>(Status.INIT);
+    private final AtomicReference<Status> status = new AtomicReference<>(null);
     private final ExecutorService service = Executors.newSingleThreadExecutor(new ServerThreadFactory(this.getClass().getSimpleName()));
 
     private final  AtomicReference<Boolean> started =  new AtomicReference<>(Boolean.FALSE);
@@ -41,27 +41,35 @@ public abstract class AbstractService implements IService {
 
     @Override
     public void waitForRun() throws InterruptedException {
-        checkStatus(Status.INIT_OK);
+        checkStatus(Status.START_BEGIN);
         int counter = 0;
-        while (status.get() == Status.INIT_OK && counter <= NUMBER_ATTEMPTS) {
+        while (status.get() == Status.START_BEGIN && counter <= NUMBER_ATTEMPTS) {
             TimeUnit.SECONDS.sleep(TIMEOUT);
             counter++;
         }
-        checkStatus(Status.RUN);
+        checkAttempts(counter, NUMBER_ATTEMPTS);
+        checkStatus(Status.START_END);
     }
 
     @Override
     public void waitForStop() throws InterruptedException {
-        if (status.get()==Status.STOP_OK) {
+        if (status.get()==Status.START_END) {
             return;
         }
-        checkStatus(Status.STOP);
+        checkStatus(Status.STOP_BEGIN);
         int counter = 0;
-        while (!getFullStopCondidtion() && !service.isTerminated() && counter <= NUMBER_ATTEMPTS) {
+        while ((!getFullStopCondidtion() || !service.isTerminated()) && counter <= NUMBER_ATTEMPTS) {
             TimeUnit.SECONDS.sleep(TIMEOUT);
             counter++;
         }
-        setStatus(Status.STOP, Status.STOP_OK);
+        checkAttempts(counter, NUMBER_ATTEMPTS);
+        setStatus(Status.STOP_BEGIN, Status.STOP_END);
+    }
+
+    private void  checkAttempts(int real, int limit){
+        if (real>=limit){
+            throw new IllegalStateException("Operation time limit exceeded");
+        }
     }
 
     protected abstract boolean getFullStopCondidtion();
@@ -69,14 +77,14 @@ public abstract class AbstractService implements IService {
 
     @Override
     public void start() throws InterruptedException {
-        checkStatus(Status.INIT_OK);
+        setStatus(Status.INIT_END, Status.START_BEGIN);
         service.submit(getTask());
         doStart();
     }
 
     @Override
     public void stop() {
-        setStatus(Status.RUN, Status.STOP);
+        setStatus(Status.START_END, Status.STOP_BEGIN);
         doStop();
         service.shutdownNow();
     }

@@ -2,7 +2,7 @@ package com.noname.server;
 
 public interface IService {
     enum Status {
-        INIT, INIT_OK, RUN, STOP, STOP_OK
+        INIT_BEGIN, INIT_END, START_BEGIN, START_END, STOP_BEGIN, STOP_END
     }
 
     void start() throws InterruptedException;

@@ -36,13 +36,13 @@ public class Server extends AbstractService {
 
 
     public Server(Map<String, String> map, List<IRequestHandler> handlers) {
-        checkStatus(Status.INIT);
+        setStatus(null, Status.INIT_BEGIN);
         this.port = Integer.parseInt(map.getOrDefault(PORT, PORT_DEFAULT_VALUE));
         this.handlers = Collections.unmodifiableList(handlers);
         this.bossCount = Integer.parseInt(map.getOrDefault(BOSS_WORKER_COUNTS, "1"));
         this.handlersCount = Integer.parseInt(map.getOrDefault(HANDLER_WORKER_COUNTS, "4"));
         this.workersCount = Integer.parseInt(map.getOrDefault(WORKER_COUNTS, "4"));
-        setStatus(Status.INIT, Status.INIT_OK);
+        setStatus(Status.INIT_BEGIN, Status.INIT_END);
     }
 
 
@@ -50,9 +50,9 @@ public class Server extends AbstractService {
 
         @Override
         public void run() {
-            final EventLoopGroup bossGr = new NioEventLoopGroup(bossCount, new ServerThreadFactory("boss-pool"));
-            final EventLoopGroup workerGr = new NioEventLoopGroup(workersCount, new ServerThreadFactory("workers-pool"));
-            final EventExecutorGroup handlersExecutorGr = new DefaultEventExecutorGroup(handlersCount, new ServerThreadFactory("handlers-pool"));
+            final EventLoopGroup bossGr = new NioEventLoopGroup(bossCount, new ServerThreadFactory("server-boss-pool"));
+            final EventLoopGroup workerGr = new NioEventLoopGroup(workersCount, new ServerThreadFactory("server-workers-pool"));
+            final EventExecutorGroup handlersExecutorGr = new DefaultEventExecutorGroup(handlersCount, new ServerThreadFactory("server-handlers-pool"));
 
             try {
                 cas(bossGroup, null, bossGr);
@@ -72,7 +72,7 @@ public class Server extends AbstractService {
                                 // p.addLast("decoder2", new XmlDecoder());
                                 // p.addLast("encoder", new HttpResponseEncoder());
                                 p.addLast("codec", new HttpServerCodec());
-                                p.addLast("aggregator", new HttpObjectAggregator(Integer.MAX_VALUE));
+                                p.addLast("aggregator", new HttpObjectAggregator(1048576));
                                 p.addLast(handlersExecutorGr, "handler", new ServerHandler(handlers));
                             }
 
@@ -80,21 +80,15 @@ public class Server extends AbstractService {
 
 
                 ChannelFuture channelFtr = b.bind(port).sync();
-    /*            channelFtr.addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
 
-                        System.out.println("future = " + future);
-                    }
-                });*/
                 cas(channelFuture, null, channelFtr);
 
-                setStatus(Status.INIT_OK, Status.RUN);
+                setStatus(Status.START_BEGIN, Status.START_END);
                 channelFtr.channel().closeFuture().sync();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e); //TODO:log
             } finally {
-                if (handlersExecutorGr.isShuttingDown()) {
+                if (!handlersExecutorGr.isShuttingDown()) {
                     handlersExecutorGr.shutdownGracefully();
                 }
 
@@ -105,10 +99,6 @@ public class Server extends AbstractService {
                 if (!bossGr.isShutdown()) {
                     bossGr.shutdownGracefully();
                 }
-
-               // setStatus(Status.STOP, Status.STOP_OK);
-
-
             }
         }
     }
@@ -131,18 +121,7 @@ public class Server extends AbstractService {
 
     @Override
     protected void doStop() {
-        final ChannelFuture channelFuture = this.channelFuture.get();
-
-/*
-        handlersExecutorGroup.get().shutdownGracefully();
-        workerGroup.get().shutdownGracefully();
-        bossGroup.get().shutdownGracefully();*/
-
-
-        channelFuture.channel().close();
-
-
-        //channelFuture.awaitUninterruptibly();
+        this.channelFuture.get().channel().close();
     }
 
 
