@@ -17,7 +17,7 @@
     <dependencies>
         <dependency>
             <groupId>com.noname</groupId>
-            <artifactId>common</artifactId>
+            <artifactId>api</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 

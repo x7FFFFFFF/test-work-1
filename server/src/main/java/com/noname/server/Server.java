@@ -1,77 +1,66 @@
 package com.noname.server;
 
 
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.xml.XmlDecoder;
-import io.netty.handler.codec.xml.XmlFrameDecoder;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import io.netty.util.concurrent.EventExecutorGroup;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicReference;
 
 
-public class Server implements IServer {
+public class Server extends AbstractService {
+    public final static String HANDLER_WORKER_COUNTS = "server.handlers.workers.count";
+    public final static String BOSS_WORKER_COUNTS = "server.boss.workers.count";
+    public final static String WORKER_COUNTS = "server.workers.count";
+    public final static String PORT = "server.port";
+    public final static String PORT_DEFAULT_VALUE = "8888";
+    private final int bossCount;
+    private final int handlersCount;
+    private final int workersCount;
+    private final int port;
+    private final List<IRequestHandler> handlers;
+
+    private final AtomicReference<ChannelFuture> channelFuture = new AtomicReference<>(null);
+    private final AtomicReference<EventLoopGroup> bossGroup = new AtomicReference<>(null);
+    private final AtomicReference<EventLoopGroup> workerGroup = new AtomicReference<>(null);
+    private final AtomicReference<EventExecutorGroup> handlersExecutorGroup = new AtomicReference<>(null);
 
 
-    private  Status status;
-    private final ExecutorService service = Executors.newSingleThreadExecutor();
-
-    private  ChannelFuture channelFuture;
-    private   int port;
-    private   List<IRequestHandler> handlers;
-
-    private  final Lock lock = new ReentrantLock();
-    private  final Condition startWaiting = lock.newCondition();
-    public Server() {
-        lock.lock();
-        try {
-            this.status = Status.INIT;
-        } finally {
-            lock.unlock();
-        }
-
+    public Server(Map<String, String> map, List<IRequestHandler> handlers) {
+        checkStatus(Status.INIT);
+        this.port = Integer.parseInt(map.getOrDefault(PORT, PORT_DEFAULT_VALUE));
+        this.handlers = Collections.unmodifiableList(handlers);
+        this.bossCount = Integer.parseInt(map.getOrDefault(BOSS_WORKER_COUNTS, "1"));
+        this.handlersCount = Integer.parseInt(map.getOrDefault(HANDLER_WORKER_COUNTS, "4"));
+        this.workersCount = Integer.parseInt(map.getOrDefault(WORKER_COUNTS, "4"));
+        setStatus(Status.INIT, Status.INIT_OK);
     }
 
-    public void waitForStop() throws InterruptedException {
-        lock.lockInterruptibly();
-        try {
-            if (status==Status.STOP_OK) {
-                return;
-            }
-            checkStatus(Status.STOP);
-            while (status==Status.STOP) {
-                startWaiting.await();
-            }
-            checkStatus(Status.STOP_OK );
-        } finally {
-            lock.unlock();
-        }
-    }
 
     private class Task implements Runnable {
+
         @Override
         public void run() {
-            EventLoopGroup bossGroup = null;
-            EventLoopGroup workerGroup = null;
+            final EventLoopGroup bossGr = new NioEventLoopGroup(bossCount, new ServerThreadFactory("boss-pool"));
+            final EventLoopGroup workerGr = new NioEventLoopGroup(workersCount, new ServerThreadFactory("workers-pool"));
+            final EventExecutorGroup handlersExecutorGr = new DefaultEventExecutorGroup(handlersCount, new ServerThreadFactory("handlers-pool"));
+
             try {
-                bossGroup = new NioEventLoopGroup();
-                workerGroup = new NioEventLoopGroup();
+                cas(bossGroup, null, bossGr);
+                cas(workerGroup, null, workerGr);
+                cas(handlersExecutorGroup, null, handlersExecutorGr);
+
                 ServerBootstrap b = new ServerBootstrap();
-                b.group(bossGroup, workerGroup)
+                b.group(bossGr, workerGr)
                         .channel(NioServerSocketChannel.class)
                         .childHandler(new ChannelInitializer<SocketChannel>() {
                             @Override
@@ -80,130 +69,81 @@ public class Server implements IServer {
                                 //p.addLast("codec", new HttpServerCodec());   //TODO: XmlDecoder / encoder
 
                                 //p.addLast("decoder1", new HttpRequestDecoder());
-                               // p.addLast("decoder2", new XmlDecoder());
-                               // p.addLast("encoder", new HttpResponseEncoder());
+                                // p.addLast("decoder2", new XmlDecoder());
+                                // p.addLast("encoder", new HttpResponseEncoder());
                                 p.addLast("codec", new HttpServerCodec());
                                 p.addLast("aggregator", new HttpObjectAggregator(Integer.MAX_VALUE));
-                                p.addLast("handler", new ServerHandler(handlers));
+                                p.addLast(handlersExecutorGr, "handler", new ServerHandler(handlers));
                             }
 
                         });
 
 
-               ChannelFuture channelFuture = b.bind(port).sync();
+                ChannelFuture channelFtr = b.bind(port).sync();
+    /*            channelFtr.addListener(new ChannelFutureListener() {
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception {
 
+                        System.out.println("future = " + future);
+                    }
+                });*/
+                cas(channelFuture, null, channelFtr);
 
-                setStatus(Status.RUN);
-                channelFuture.channel().closeFuture().sync();
+                setStatus(Status.INIT_OK, Status.RUN);
+                channelFtr.channel().closeFuture().sync();
             } catch (InterruptedException e) {
-                e.printStackTrace();//TODO: logging
-
+                throw new RuntimeException(e); //TODO:log
             } finally {
-                if (bossGroup != null) {
-                    bossGroup.shutdownGracefully();
+                if (handlersExecutorGr.isShuttingDown()) {
+                    handlersExecutorGr.shutdownGracefully();
                 }
-                if (workerGroup != null) {
-                    workerGroup.shutdownGracefully();
+
+                if (!workerGr.isShutdown()) {
+                    workerGr.shutdownGracefully();
                 }
-                setStatus( Status.STOP_OK);
 
+                if (!bossGr.isShutdown()) {
+                    bossGr.shutdownGracefully();
+                }
+
+               // setStatus(Status.STOP, Status.STOP_OK);
 
 
             }
         }
     }
-    private void setStatus(Status status) {
-        lock.lock();
-        try {
-            this.status = status;
-            this.startWaiting.signalAll();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private void checkStatus(Status expected){
-            if (expected!=status){
-                //setStatus(Status.ERROR);                //stop();
-                throw new IllegalStateException(String.format("Server expected to be  %s, but is %s",  expected, status));
-            }
-    }
 
 
     @Override
-    public void init(Properties properties, List<IRequestHandler> handlers) {
-        lock.lock();
-        try {
-            checkStatus(Status.INIT);
-            Map<String, String> map = properties.stringPropertyNames().stream().collect(Collectors.toMap(k -> k, properties::getProperty));
-            init(map, handlers);
-        } finally {
-            lock.unlock();
-        }
+    protected boolean getFullStopCondidtion() {
+        return bossGroup.get().isTerminated() && workerGroup.get().isTerminated() && handlersExecutorGroup.get().isTerminated();
     }
 
     @Override
-    public void init(Map<String, String> map, List<IRequestHandler> handlers) {
-        lock.lock();
-        try {
-            checkStatus(Status.INIT);
-            this.port = Integer.parseInt(map.getOrDefault(PORT, PORT_DEFAULT_VALUE));
-            this.handlers= new ArrayList<>(handlers);
-            this.status=Status.INIT_OK;
-        } finally {
-            lock.unlock();
-        }
+    protected void doStart() {
 
     }
 
     @Override
-    public void start() throws InterruptedException {
-        lock.lock();
-        try {
-            checkStatus(Status.INIT_OK);
-            service.submit(new Task());
-        } finally {
-            lock.unlock();
-        }
+    protected Runnable getTask() {
+        return new Task();
     }
 
     @Override
-    public void stop() {
-        service.shutdownNow();
-        try {
-            lock.lock();
-            status = Status.STOP;
-            startWaiting.signalAll();
-            if (channelFuture!=null) {
-                channelFuture.channel().close();
-                channelFuture.awaitUninterruptibly();
-            }
-        } finally{
-            lock.unlock();
-        }
+    protected void doStop() {
+        final ChannelFuture channelFuture = this.channelFuture.get();
+
+/*
+        handlersExecutorGroup.get().shutdownGracefully();
+        workerGroup.get().shutdownGracefully();
+        bossGroup.get().shutdownGracefully();*/
+
+
+        channelFuture.channel().close();
+
+
+        //channelFuture.awaitUninterruptibly();
     }
 
-    @Override
-    public Status getStatus() {
-        lock.lock();
-        try {
-            return this.status;
-        } finally {
-            lock.unlock();
-        }
-    }
 
-    @Override
-    public void waitForRun() throws InterruptedException {
-        lock.lockInterruptibly();
-        try {
-            checkStatus(Status.INIT_OK);
-            while (status==Status.INIT_OK) {
-                startWaiting.await();
-            }
-            checkStatus(Status.RUN );
-        } finally {
-            lock.unlock();
-        }
-    }
 }

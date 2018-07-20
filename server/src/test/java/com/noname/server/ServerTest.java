@@ -23,10 +23,9 @@ public class ServerTest {
     @Test
     public void test() throws Exception {
         Map<String,String> params = new HashMap<>();
-        params.put(IServer.PORT, "8881");
+        params.put(Server.PORT, "8881");
 
-        final Server server = new Server();
-        server.init(params, Collections.singletonList(new IRequestHandler() {
+        final Server server = new Server(params, Collections.singletonList(new IRequestHandler() {
 
             @Override
             public Methods getMethod() {
@@ -73,6 +72,10 @@ public class ServerTest {
         Assert.assertNotNull(responsePayload);
         Assert.assertEquals(responsePayload.getResultCode(), 0);
         client.stop();
+
+
+        server.stop();
+        server.waitForStop();
 
     }
 
