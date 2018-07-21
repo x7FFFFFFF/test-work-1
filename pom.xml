@@ -11,7 +11,8 @@
     <modules>
         <module>server</module>
         <module>api</module>
-        <module>mongo</module>
+        <module>h2</module>
+        <module>common</module>
     </modules>
     <dependencyManagement>
         <dependencies>
