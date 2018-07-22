@@ -1,4 +1,4 @@
-package com.noname.options;
+package com.noname;
 
 import org.h2.tools.Server;
 

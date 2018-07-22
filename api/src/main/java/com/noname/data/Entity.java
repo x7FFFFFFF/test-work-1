@@ -8,6 +8,8 @@ public interface Entity<T extends Enum<T> & Field> {
 
     EnumMap<T, Object> getValues();
 
+    Class<T> getFieldsClass();
+
     default T getPKField() {
         final Set<T> keySet = getValues().keySet();
         for (T key : keySet) {

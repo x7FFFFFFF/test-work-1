@@ -13,4 +13,8 @@ public class User implements Entity<UserFields> {
         return field;
     }
 
+    @Override
+    public Class<UserFields> getFieldsClass() {
+        return UserFields.class;
+    }
 }

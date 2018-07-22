@@ -10,6 +10,6 @@ public interface Field {
         return false;
     }
 
-  
+   Class<? extends Entity> getEntityClass();
 
 }

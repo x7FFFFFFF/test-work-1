@@ -1,5 +1,6 @@
 package com.noname.enities;
 
+import com.noname.data.Entity;
 import com.noname.data.Field;
 
 import java.math.BigDecimal;
@@ -64,4 +65,8 @@ public enum UserFields implements Field {
     };
 
 
+    @Override
+    public Class<? extends Entity> getEntityClass() {
+        return User.class;
+    }
 }
