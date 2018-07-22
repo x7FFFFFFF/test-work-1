@@ -1,4 +1,4 @@
-package com.noname.logic;
+package com.noname.dao;
 
 import com.noname.data.Entity;
 import com.noname.data.Field;
@@ -8,10 +8,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.MessageFormat;
 import java.util.*;
 
-public interface JDBCDao extends GenericDao, AutoCloseable {
+public interface JDBCDao extends GenericDao {
 
 
     Connection getConnection(); //TODO: Connections pool
@@ -19,16 +18,15 @@ public interface JDBCDao extends GenericDao, AutoCloseable {
     //PreparedStatement getStatementCache(String str);
 
 
+    String getSelectByFieldQuery();
 
-    MessageFormat getSelectByFieldQuery();
-
-    MessageFormat getInsertQuery();
+    String getInsertQuery();
 
 
     @Override
     default <T extends Enum<T> & Field> void persist(Entity<T> object) throws Exception {
         final AbstractMap.SimpleImmutableEntry<String, String> fieldsAndValues = getFieldsAndValues(object, true);
-        String query = getInsertQuery().format(object.getClass().getSimpleName().toLowerCase(), fieldsAndValues.getKey(), fieldsAndValues.getValue());
+        String query = String.format(getInsertQuery(), getTableName(object), fieldsAndValues.getKey(), fieldsAndValues.getValue());
         try (PreparedStatement statement = getConnection().prepareStatement(query)) {
             prepareStatementForInsert(statement, object);
             int count = statement.executeUpdate();
@@ -40,6 +38,10 @@ public interface JDBCDao extends GenericDao, AutoCloseable {
         //TODO: get last insert ID
 
 
+    }
+
+    default <T extends Enum<T> & Field> String getTableName(Entity<T> object) {
+        return object.getClass().getSimpleName();
     }
 
 
@@ -87,7 +89,7 @@ public interface JDBCDao extends GenericDao, AutoCloseable {
         final Class<? extends Entity> entityClass = getEntityClass(fieldsClass);
 
 
-        String query = getSelectByFieldQuery().format(fields, entityClass.getSimpleName().toLowerCase(), fields, field.getName());
+        String query = String.format(getSelectByFieldQuery(), fields, entityClass.getSimpleName(), field.getName());
         try (PreparedStatement statement = getConnection().prepareStatement(query)) {
             prepareStatementForSelect(statement, field, object);
             ResultSet rs = statement.executeQuery();
@@ -111,19 +113,25 @@ public interface JDBCDao extends GenericDao, AutoCloseable {
             final Class<? extends Entity> entityClass = getEntityClass(type);
             final Entity<T> entity = entityClass.newInstance();
             final T[] enumConstants = type.getEnumConstants();
+            int counter = 1;
             for (T key : enumConstants) {
                 final Class<?> keyType = key.getType();
                 final String name = key.getName();
                 if (keyType == String.class) {
-                    entity.setValue(key, rs.getString(name));
+                    entity.setValue(key, rs.getString(counter));
                 } else if (keyType == Long.class) {
-                    entity.setValue(key, rs.getLong(name));
+                    entity.setValue(key, rs.getLong(counter));
                 } else if (keyType == BigDecimal.class) {
-                    entity.setValue(key, rs.getBigDecimal(name));
+
+                    final BigDecimal value = rs.getBigDecimal(counter);
+
+                    entity.setValue(key, (value==null)?BigDecimal.ZERO:value);
                 } else {
                     throw new IllegalStateException("Unknown type = " + keyType);
                 }
+                counter++;
             }
+            result.add(entity);
         }
 
         return result;

@@ -5,7 +5,10 @@ import com.noname.server.RequestHandler;
 import com.noname.threads.AbstractService;
 import com.noname.threads.ServerThreadFactory;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -36,6 +39,10 @@ public class Server extends AbstractService {
     private final AtomicReference<EventLoopGroup> bossGroup = new AtomicReference<>(null);
     private final AtomicReference<EventLoopGroup> workerGroup = new AtomicReference<>(null);
     private final AtomicReference<EventExecutorGroup> handlersExecutorGroup = new AtomicReference<>(null);
+
+    public Server(Integer port, List<RequestHandler> handlers) {
+        this(Collections.singletonMap(PORT, port.toString()), handlers);
+    }
 
 
     public Server(Map<String, String> map, List<RequestHandler> handlers) {

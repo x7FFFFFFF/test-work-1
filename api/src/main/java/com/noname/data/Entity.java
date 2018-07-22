@@ -29,6 +29,10 @@ public interface Entity<T extends Enum<T> & Field> {
         return clz.cast(getValues().get(key));
     }
 
+    default <K> K getValue(T key) {
+        return (K)getValues().get(key);
+    }
+
     default void setValue(T key, Object value) {
         checkType(key, value);
         getValues().put(key, value);

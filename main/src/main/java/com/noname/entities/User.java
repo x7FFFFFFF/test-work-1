@@ -1,4 +1,4 @@
-package com.noname.enities;
+package com.noname.entities;
 
 import com.noname.data.Entity;
 

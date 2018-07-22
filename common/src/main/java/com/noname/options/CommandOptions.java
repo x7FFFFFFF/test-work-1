@@ -58,8 +58,16 @@ public class CommandOptions<K extends Enum<K> & IOption> {
 
     public <T> T getValue(K key, Class<T> clz) {
         final List<Object> objects = map.get(key);
+        if (objects == null) {
+            if (key.getType()==Boolean.class) {
+                return clz.cast(Boolean.FALSE);
+            } else {
+                return null; //FIXME: Optional
+            }
+        }
         return clz.cast(objects.get(0));
     }
+
 
 
     private void put(K key, String value) {

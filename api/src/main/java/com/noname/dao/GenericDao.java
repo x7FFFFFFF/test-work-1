@@ -1,4 +1,4 @@
-package com.noname.logic;
+package com.noname.dao;
 
 import com.noname.data.Entity;
 import com.noname.data.Field;
@@ -6,7 +6,7 @@ import com.noname.data.Identified;
 
 import java.util.List;
 
-public interface GenericDao {
+public interface GenericDao extends AutoCloseable {
 
     <T extends Enum<T> & Field> void persist(Entity<T> object) throws Exception;
 

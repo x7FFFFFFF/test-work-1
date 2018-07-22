@@ -1,7 +1,5 @@
 package com.noname.dao;
 
-import com.noname.logic.JDBCDao;
-
 public class OptionsDAO {
     private final String  user;
     private final String  password;

@@ -1,20 +1,16 @@
 package com.noname.dao;
 
-import com.noname.logic.GenericDao;
-import com.noname.logic.JDBCDao;
-
 import java.lang.reflect.Constructor;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DAOFactory {
+    private DAOFactory() {
+    }
 
-
-
-
-    static GenericDao getInstance(OptionsDAO optionsDAO) {
-        loadDriver(optionsDAO);
+    public static GenericDao getInstance(OptionsDAO optionsDAO) {
+       // loadDriver(optionsDAO);
         final Connection connection = getConnection(optionsDAO);
 
         final Class<? extends JDBCDao> daoImplClass = optionsDAO.getDaoImplClass();
@@ -30,13 +26,13 @@ public class DAOFactory {
 
     }
 
-    private static void loadDriver(OptionsDAO optionsDAO) {
+/*    private static void loadDriver(OptionsDAO optionsDAO) {
         try {
             Class.forName(optionsDAO.getDriver());
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
-    }
+    }*/
 
     private static Connection getConnection(OptionsDAO optionsDAO) {
         Connection connection = null;
