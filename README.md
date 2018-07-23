@@ -18,8 +18,8 @@ etc.<br/>
 
 #### Test
 Default url is "/test".  It can be changed in settings.properties file. <br/>
-###### http://localhost:8081/test 
-###### http://localhost:8082/test 
+###### localhost:8081/test 
+###### localhost:8082/test 
 
 
 
