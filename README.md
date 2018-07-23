@@ -16,3 +16,11 @@ mvn clean package
 //run http server on port 8082, use db server on port 8888 (mast be already started)<br/>
 etc.<br/>
 
+#### Test
+Default url is "/test".  It can be changed in settings.properties file. <br/>
+###### http://localhost:8081/test 
+###### http://localhost:8082/test 
+
+
+
+
