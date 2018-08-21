@@ -7,7 +7,7 @@ public enum  Options implements IOption {
     iS_DB_SERVER {
 
 
-        static final String iS_DB_SERVER = "-isDbServer";
+        static final String iS_DB_SERVER = "isDbServer";
 
         @Override
         public Class<?> getType() {
@@ -22,7 +22,7 @@ public enum  Options implements IOption {
     iS_HTTP_SERVER {
 
 
-        static final String iS_HTTP_SERVER = "-isHttpServer";
+        static final String iS_HTTP_SERVER = "isHttpServer";
 
         @Override
         public Class<?> getType() {
@@ -37,7 +37,7 @@ public enum  Options implements IOption {
     PORT {
 
 
-        static final String PORT = "-port";
+        static final String PORT = "port";
 
         @Override
         public Class<?> getType() {
@@ -52,7 +52,7 @@ public enum  Options implements IOption {
     DB_SERVER {
 
 
-        static final String DB_SERVER = "-dbServer";
+        static final String DB_SERVER = "dbServer";
 
         @Override
         public Class<?> getType() {
@@ -68,7 +68,7 @@ public enum  Options implements IOption {
     JDBC_URL {
 
 
-        static final String JDBC_URL = "-jdbc";
+        static final String JDBC_URL = "jdbc";
 
         @Override
         public Class<?> getType() {

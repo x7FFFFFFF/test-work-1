@@ -8,11 +8,11 @@ mvn clean package
 
 #### Run
 ###### cd main/target<br/>
-###### java -jar TestWebService.jar -isDbServer -port 8888
+###### java -DisDbServer -Dport=8888 -jar TestWebService.jar
 // run db server on port 8888 <br/>
-###### java -jar TestWebService.jar  -isHttpServer -port 8081 -dbServer localhost:8888
+###### java -DisHttpServer -Dport=8081 -DdbServer=localhost:8888 -jar TestWebService.jar
 //run http server on port 8081, use db server on port 8888 (mast be already started)<br/>
-###### java -jar TestWebService.jar  -isHttpServer -port 8082 -dbServer localhost:8888
+###### java   -DisHttpServer -Dport=8082 -DdbServer=localhost:8888 -jar TestWebService.jar
 //run http server on port 8082, use db server on port 8888 (mast be already started)<br/>
 etc.<br/>
 

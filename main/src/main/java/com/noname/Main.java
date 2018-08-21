@@ -14,6 +14,7 @@ import com.noname.server.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Properties;
 
 public class Main {
@@ -23,39 +24,47 @@ public class Main {
     private static final String JDBC_PASSWORD = "jdbc.password";
     public static final String HTTP_URL = "http.url";
 
-    public static void main(String[] args) throws Exception {
-        if (args.length == 0) {
-            printUsage();
-            System.exit(0);
-        }
-        CommandOptions<Options> options = new CommandOptions<>(args, Options.class);
-        verify(options);
-        final Boolean isDbServer = options.getValue(Options.iS_DB_SERVER, Boolean.class);
-        final Boolean isHttpServer = options.getValue(Options.iS_HTTP_SERVER, Boolean.class);
-        final Integer port = options.getValue(Options.PORT, Integer.class);
-        Properties properties = load("settings.properties");
 
-        if (isDbServer) {
-            System.out.println("Starting DB server on port " + port);
-            startDB(port, properties);
-        } else if (isHttpServer) {
-            publishDAO(options, properties);
-            startHttpServer(port, properties);
-        }
+
+
+    public static void main(String[] args) throws Exception {
+        final Main main = new Main();
+        main.run(args);
 
 
     }
 
-    private static Properties load(String filename) throws IOException {
+     void run(String[] args) throws Exception {
+       /* if (args.length == 0) {
+            this.printUsage();
+            System.exit(0);
+        }*/
+
+        this.verify();
+        final Optional<Boolean> isDbServer = CommandOptions.get(Options.iS_DB_SERVER, Boolean.class);
+        final Optional<Boolean> isHttpServer = CommandOptions.get(Options.iS_HTTP_SERVER, Boolean.class);
+        final Optional<Integer> port = CommandOptions.get(Options.PORT, Integer.class);
+        Properties properties = this.load("settings.properties");
+
+        if (isDbServer.isPresent()) {
+            System.out.println("Starting DB server on port " + port);
+            this.startDB(port.get(), properties);
+        } else if (isHttpServer.isPresent()) {
+            this.publishDAO(properties);
+            this.startHttpServer(port.get(), properties);
+        }
+    }
+
+    Properties load(String filename) throws IOException {
         Properties res = new Properties();
-        try (InputStream inputStream = ClassLoader.getSystemResourceAsStream(filename)){
+        try (InputStream inputStream = ClassLoader.getSystemResourceAsStream(filename)) {
             res.load(inputStream);
         }
         return res;
     }
 
-    private static void publishDAO(CommandOptions<Options> options, Properties properties) {
-        final String dbServer = options.getValue(Options.DB_SERVER, String.class);
+    void publishDAO(Properties properties) {
+        final Optional<String> dbServer = CommandOptions.get(Options.DB_SERVER, String.class);
         if (dbServer == null) {
             System.out.println("Missing argument: " + Options.DB_SERVER.getName());
             System.exit(0);
@@ -76,35 +85,36 @@ public class Main {
 
     }
 
-    private static void startDB(Integer port, Properties properties) throws Exception {
+    void startDB(Integer port, Properties properties) throws Exception {
         final H2DBService h2DBService = new H2DBService(port);
         h2DBService.start();
 
     }
 
-    private static void startHttpServer(Integer port, Properties properties) throws Exception {
+    void startHttpServer(Integer port, Properties properties) throws Exception {
         final String url = properties.getProperty(HTTP_URL);
         Service service = new Server(port, Collections.singletonList(new HttpHandler(url)));
         service.start();
     }
 
-    private static void printUsage() {
+    void printUsage() {
         System.out.println("Arguments example:");
-        System.out.println(" -isDbServer -port <db_port_number_listen>");
+        System.out.println("java -DisDbServer -Dport=<db_port_number_listen> TestWebService.jar");
         System.out.println("or");
-        System.out.println("-isHttpServer -port <http_port_number_listen> -dbServer <db_port_number_listen>");
+        System.out.println("java  -DisHttpServer -Dport=<http_port_number_listen> -DdbServer=<db_port_number_listen> TestWebService.jar");
     }
 
-    private static void verify(CommandOptions<Options> options) {
+    void verify() {
 
-        final Boolean isHttpServer = options.getValue(Options.iS_HTTP_SERVER, Boolean.class);
-        final Boolean isDbServer = options.getValue(Options.iS_DB_SERVER, Boolean.class);
-        if (isHttpServer && isDbServer) {
+        final Optional<Boolean> isHttpServer = CommandOptions.get(Options.iS_HTTP_SERVER, Boolean.class);
+
+        final Optional<Boolean> isDbServer =  CommandOptions.get(Options.iS_DB_SERVER, Boolean.class);
+        if (isHttpServer.isPresent() && isDbServer.isPresent()) {
             System.out.println("Usage both options: " + Options.iS_HTTP_SERVER.getName() + ", " + Options.iS_DB_SERVER.getName() + "is not supported");
             System.exit(0);
         }
-        final String dbServer = options.getValue(Options.DB_SERVER, String.class);
-        if (isHttpServer && dbServer == null) {
+        final Optional<String> dbServer = CommandOptions.get(Options.DB_SERVER, String.class);
+        if (isHttpServer.isPresent() && !dbServer.isPresent()) {
             System.out.println("Missing argument: " + Options.DB_SERVER.getName());
             System.exit(0);
         }
